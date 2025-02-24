@@ -56,6 +56,11 @@ public class PartyTobXpDropsOverlay extends OverlayPanel
 			return null;
 		}
 
+		if (!config.displayXpDrops())
+		{
+			return null;
+		}
+
 		for (PartyTobXpDropsPlugin.PlayerOrb playerOrb : plugin.getPlayerOrbs())
 		{
 			if (client.getVarbitValue(playerOrb.getHealthVarb()) == 0) // Orb doesn't exist

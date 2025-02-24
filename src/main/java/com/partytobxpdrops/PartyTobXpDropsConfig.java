@@ -3,27 +3,35 @@ package com.partytobxpdrops;
 import com.partytobxpdrops.misc.Fonts;
 import java.awt.Color;
 import java.awt.Font;
-import net.runelite.client.config.Alpha;
-import net.runelite.client.config.Config;
-import net.runelite.client.config.ConfigGroup;
-import net.runelite.client.config.ConfigItem;
-import net.runelite.client.config.ConfigSection;
+
+import net.runelite.client.config.*;
 
 @ConfigGroup(PartyTobXpDropsConfig.GROUP)
-public interface PartyTobXpDropsConfig extends Config
-{
+public interface PartyTobXpDropsConfig extends Config {
 	String GROUP = "partytobxpdrops";
 
 	@ConfigSection(
-		name = "General",
-		position = 0,
-		description = "GeneralSettings",
-		closedByDefault = false
+			name = "General",
+			position = 0,
+			description = "GeneralSettings",
+			closedByDefault = false
 	)
 	String generalSettings = "generalSettings";
 
 	@ConfigItem(
-		position = 0,
+			position = 0,
+			keyName = "Display XP",
+			name = "Display XP Drops",
+			description = "Enable XP Drop display.",
+			section = generalSettings
+	)
+	default boolean displayXpDrops()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		position = 1,
 		keyName = "displayTicksRemaining",
 		name = "Display ticks remaining",
 		description = "Display xp drop cooldown",
@@ -35,7 +43,7 @@ public interface PartyTobXpDropsConfig extends Config
 	}
 
 	@ConfigItem(
-		position = 1,
+		position = 2,
 		keyName = "ticksToKeep",
 		name = "Ticks to keep",
 		description = "Number of ticks till xp drop disappears. If it's set to 0 players cooldown will be used instead",
@@ -47,7 +55,7 @@ public interface PartyTobXpDropsConfig extends Config
 	}
 
 	@ConfigItem(
-		position = 2,
+		position = 3,
 		keyName = "fontsName",
 		name = "Fonts",
 		description = "Fonts to use for xp",
@@ -59,7 +67,7 @@ public interface PartyTobXpDropsConfig extends Config
 	}
 
 	@ConfigItem(
-		position = 3,
+		position = 4,
 		keyName = "fontsSize",
 		name = "Font Size",
 		description = "Size of fonts",
@@ -71,7 +79,7 @@ public interface PartyTobXpDropsConfig extends Config
 	}
 
 	@ConfigItem(
-		position = 4,
+		position = 5,
 		keyName = "fontsBold",
 		name = "Bold",
 		description = "Bold fonts",
@@ -84,7 +92,7 @@ public interface PartyTobXpDropsConfig extends Config
 
 	@Alpha
 	@ConfigItem(
-		position = 5,
+		position = 6,
 		keyName = "playerNameColor",
 		name = "Player Name Color",
 		description = "Color of player name",
@@ -99,7 +107,7 @@ public interface PartyTobXpDropsConfig extends Config
 		name = "Players",
 		position = 1,
 		description = "Show players (based on orb order)",
-		closedByDefault = false
+		closedByDefault = true
 	)
 	String playerSettings = "playerSettings";
 
@@ -167,7 +175,7 @@ public interface PartyTobXpDropsConfig extends Config
 		name = "Targets",
 		position = 2,
 		description = "Show xp drops in rooms",
-		closedByDefault = false
+		closedByDefault = true
 	)
 	String roomSettings = "roomSettings";
 
@@ -259,7 +267,7 @@ public interface PartyTobXpDropsConfig extends Config
 		name = "Styles",
 		position = 3,
 		description = "Show styles",
-		closedByDefault = false
+		closedByDefault = true
 	)
 	String styleSettings = "styleSettings";
 
@@ -297,5 +305,214 @@ public interface PartyTobXpDropsConfig extends Config
 	default boolean showMelee()
 	{
 		return true;
+	}
+	@ConfigSection(
+			position = 5,
+			name = "Party Hits Overlay",
+			description = "Party Hits Settings",
+			closedByDefault = true
+	)
+	String partyHitsSettings = "partyHitsSettings";
+
+	@ConfigItem(
+			position = 0,
+			keyName = "Show party hits",
+			name = "Show party hits",
+			description = "Show the hits of your party members.",
+			section = partyHitsSettings
+	)
+	default boolean partyHits()
+	{
+		return false;
+	}
+	@ConfigItem(
+			position = 1,
+			keyName = "Duration",
+			name = "Hitsplat duration",
+			description = "How long should the hitsplat stay for (in frames).",
+			section = partyHitsSettings
+	)
+	default int duration()
+	{
+		return 150;
+	}
+	@ConfigItem(
+			position = 2,
+			keyName = "Maiden Only",
+			name = "Maiden Only",
+			description = "Only show hits in the maiden room.",
+			section = partyHitsSettings
+	)
+	default boolean maidenOnly()
+	{
+		return false;
+	}
+	@ConfigItem(
+			position = 3,
+			keyName = "Show Self",
+			name = "Show Self",
+			description = "Show your own hits.",
+			section = partyHitsSettings
+	)
+	default boolean ownHits()
+	{
+		return false;
+	}
+	@Range(min = -100, max = 100)
+	@ConfigItem(
+			position = 5,
+			keyName = "Height Offset",
+			name = "Height Offset",
+			description = "Make the hitsplat higher above the player.",
+			section = partyHitsSettings
+	)
+	default int offset()
+	{
+		return 20;
+	}
+	@Range(min = -100, max = 100)
+	@ConfigItem(
+			position = 6,
+			keyName = "Horizontal Offset",
+			name = "Horizontal Offset",
+			description = "Adjust the horizontal offset of the text.",
+			section = partyHitsSettings
+	)
+	default int horOffset()
+	{
+		return 0;
+	}
+	@ConfigItem(
+			position = 7,
+			keyName = "Font",
+			name = "Font",
+			description = "Change the font of the text.",
+			section = partyHitsSettings
+	)
+	default Fonts partyHitFont()
+	{
+		return Fonts.ARIAL;
+	}
+	@ConfigItem(
+			position = 8,
+			keyName = "Font Size",
+			name = "Font Size",
+			description = "Change the size of the text.",
+			section = partyHitsSettings
+	)
+	default int size()
+	{
+		return 15;
+	}
+	@ConfigItem(
+			position = 9,
+			keyName = "Text Color",
+			name = "Text Color",
+			description = "Change the color of the text.",
+			section = partyHitsSettings
+	)
+	default Color color()
+	{
+		return Color.WHITE;
+	}
+
+	@ConfigSection(
+			position = 4,
+			name = "Maiden Live HP",
+			description = "Maiden HP settings",
+			closedByDefault = true
+	)
+	String maidenHpSettings = "maidenHpSettings";
+
+	@ConfigItem(
+			position = 0,
+			name = "Show Maiden HP",
+			keyName = "Show Maiden HP",
+			description = "Show Maiden Live HP Overlay",
+			section = maidenHpSettings
+	)
+	default boolean showMaidenHp()
+	{
+		return false;
+	}
+
+	@Range(min = -100, max = 100)
+	@ConfigItem(
+			position = 1,
+			keyName = "Maiden Height Offset",
+			name = "Maiden Height Offset",
+			description = "Make the Maiden HP higher.",
+			section = maidenHpSettings
+	)
+	default int maidenOffset()
+	{
+		return 30;
+	}
+	@Range(min = -100, max = 100)
+	@ConfigItem(
+			position = 2,
+			keyName = "Maiden Horizontal Offset",
+			name = "Maiden Horizontal Offset",
+			description = "Adjust the horizontal offset of the text on maiden.",
+			section = maidenHpSettings
+	)
+	default int maidenHorOffset()
+	{
+		return -5;
+	}
+	@ConfigItem(
+			position = 3,
+			keyName = "Maiden Font",
+			name = "Maiden Font",
+			description = "Change the font of the HP on maiden.",
+			section = maidenHpSettings
+	)
+	default Fonts maidenFont()
+	{
+		return Fonts.ARIAL;
+	}
+	@ConfigItem(
+			position = 4,
+			keyName = "Maiden Font Size",
+			name = "Maiden Font Size",
+			description = "Change the size of the HP on maiden.",
+			section = maidenHpSettings
+	)
+	default int maidenSize()
+	{
+		return 15;
+	}
+	@ConfigItem(
+			position = 5,
+			keyName = "Maiden Text Color",
+			name = "Maiden Text Color",
+			description = "Change the color of the text on maiden.",
+			section = maidenHpSettings
+	)
+	default Color maidenColor()
+	{
+		return Color.GREEN;
+	}
+	@ConfigItem(
+			position = 6,
+			keyName = "Sync hits",
+			name = "Sync hits",
+			description = "Sync your hits with your teammates (delays your hits updating slightly)",
+			section = maidenHpSettings
+	)
+	default boolean syncHits()
+	{
+		return false;
+	}
+	@ConfigItem(
+			position = 7,
+			keyName = "Update Threshold",
+			name = "Update Threshold",
+			description = "Only update Maidens HP if change is more than x% from old hp",
+			section = maidenHpSettings
+	)
+	default double updateThreshold()
+	{
+		return 0.2;
 	}
 }

@@ -6,34 +6,24 @@ import com.partytobxpdrops.attacks.AttackStyle;
 import com.partytobxpdrops.attacks.WeaponType;
 import com.partytobxpdrops.constants.TobNpc;
 import com.partytobxpdrops.constants.TobRegion;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+
+import java.util.*;
 import javax.inject.Inject;
+
+import com.partytobxpdrops.maiden.MaidenHandler;
+import com.partytobxpdrops.misc.Hit;
 import lombok.Data;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Actor;
-import net.runelite.api.ChatMessageType;
-import net.runelite.api.Client;
-import net.runelite.api.GameState;
-import net.runelite.api.NPC;
-import net.runelite.api.Varbits;
-import net.runelite.api.events.FakeXpDrop;
-import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.GameTick;
-import net.runelite.api.events.StatChanged;
-import net.runelite.api.events.VarbitChanged;
-import net.runelite.api.Item;
-import net.runelite.api.ItemContainer;
-import net.runelite.api.EquipmentInventorySlot;
-import net.runelite.api.InventoryID;
-import net.runelite.api.VarPlayer;
+import net.runelite.api.*;
+import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.*;
+import net.runelite.api.kit.KitType;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.plugins.PluginDependency;
+import net.runelite.client.plugins.party.PartyPlugin;
+import net.runelite.client.plugins.xptracker.XpTrackerPlugin;
 import net.runelite.http.api.item.ItemEquipmentStats;
 import net.runelite.http.api.item.ItemStats;
 import net.runelite.client.callback.ClientThread;
@@ -44,11 +34,7 @@ import net.runelite.client.events.PartyChanged;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
 import net.runelite.client.plugins.Plugin;
-import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.party.PartyPlugin;
-import net.runelite.client.plugins.xptracker.XpTrackerPlugin;
-import net.runelite.api.Skill;
 import net.runelite.client.ui.overlay.OverlayManager;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -83,9 +69,16 @@ public class PartyTobXpDropsPlugin extends Plugin
 
 	@Inject
 	private PartyTobXpDropsOverlay overlay;
-
+	@Inject
+	private PartyHitsOverlay partyHitsOverlay;
 	@Inject
 	private ItemManager itemManager;
+	@Inject
+	private XpToDamage xpToDamage;
+	@Inject
+	private MaidenHandler maidenHandler;
+	@Inject
+	private EventBus eventBus;
 
 	@Getter
 	private boolean inTob;
@@ -127,6 +120,30 @@ public class PartyTobXpDropsPlugin extends Plugin
 		Skill.HITPOINTS,
 		Skill.MAGIC);
 
+	private static final Set<Integer> RANGED_BOWS = new HashSet<>(Arrays.asList(
+			ItemID.TWISTED_BOW, ItemID.BOW_OF_FAERDHINEN, ItemID.BOW_OF_FAERDHINEN_C,
+			ItemID.ARMADYL_CROSSBOW, ItemID.RUNE_CROSSBOW, ItemID.DRAGON_CROSSBOW
+	));
+	private static final Set<Integer> RANGED_THROWN = new HashSet<>(Arrays.asList(
+			ItemID.CHINCHOMPA_10033, ItemID.RED_CHINCHOMPA_10034, ItemID.BLACK_CHINCHOMPA,
+			ItemID.BLAZING_BLOWPIPE, ItemID.TOXIC_BLOWPIPE
+	));
+	private static final Set<Integer> POWERED_STAVES = new HashSet<>(Arrays.asList(
+			ItemID.SANGUINESTI_STAFF,
+			ItemID.TRIDENT_OF_THE_SEAS_FULL,
+			ItemID.TRIDENT_OF_THE_SEAS,
+			ItemID.TRIDENT_OF_THE_SWAMP,
+			ItemID.TRIDENT_OF_THE_SWAMP_E,
+			ItemID.HOLY_SANGUINESTI_STAFF,
+			ItemID.ACCURSED_SCEPTRE,
+			ItemID.WARPED_SCEPTRE
+	));
+	private static final Set<Integer> SHADOW = new HashSet<>(Arrays.asList(
+			ItemID.TUMEKENS_SHADOW,
+			ItemID.CORRUPTED_TUMEKENS_SHADOW
+	));
+	private final int MAIDEN_REGIONID = 12613;
+
 	@Provides
 	PartyTobXpDropsConfig provideConfig(ConfigManager configManager)
 	{
@@ -138,7 +155,10 @@ public class PartyTobXpDropsPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		wsClient.registerMessage(XpDropMessage.class);
+		wsClient.registerMessage(Hit.class);
 		overlayManager.add(overlay);
+		overlayManager.add(partyHitsOverlay);
+		eventBus.register(maidenHandler);
 		if (client.getGameState() == GameState.LOGGED_IN)
 		{
 			clientThread.invokeLater(this::loadPreviousXpValues);
@@ -151,7 +171,10 @@ public class PartyTobXpDropsPlugin extends Plugin
 	protected void shutDown() throws Exception
 	{
 		wsClient.unregisterMessage(XpDropMessage.class);
+		wsClient.unregisterMessage(Hit.class);
 		overlayManager.remove(overlay);
+		overlayManager.remove(partyHitsOverlay);
+		eventBus.unregister(maidenHandler);
 		tickXp.clear();
 		partyXp.clear();
 	}
@@ -254,6 +277,8 @@ public class PartyTobXpDropsPlugin extends Plugin
 		int xp = xpNow - xpBefore;
 		if (xpBefore != 0 && xp > 0)
 		{
+			processXP(event.getSkill(), xp);
+
 			if (!tickXp.containsKey(event.getSkill()))
 			{
 				tickXp.merge(event.getSkill(), xp, Integer::sum);
@@ -274,7 +299,163 @@ public class PartyTobXpDropsPlugin extends Plugin
 		{
 			return;
 		}
+		processXP(event.getSkill(), xp);
+
 		tickXp.merge(event.getSkill(), xp, Integer::sum);
+	}
+
+	private void processXP(Skill skill, int xpDrop)
+	{
+		if (!inTob)
+			return;
+
+		if (config.showMaidenHp() && !inMaidenRegion())
+			return;
+
+		if (skill == Skill.HITPOINTS)
+		{
+			Player player = client.getLocalPlayer();
+			if (player == null)
+				return;
+
+			Actor actor = player.getInteracting();
+			if (actor instanceof NPC)
+			{
+				int npcId = ((NPC) actor).getId();
+
+				int dmg = xpToDamage.calculateHit(npcId, xpDrop);
+				if (dmg > 0)
+				{
+					int projectileDelay = 0;
+					if (Objects.equals(actor.getName(), "The Maiden of Sugadinti"))
+					{
+						WorldPoint maidenLoc = actor.getWorldLocation();
+						int minDistance = 10;
+
+						for (int x = 0; x < 6; x++)
+						{
+							for (int y = 0; y < 6; y++)
+							{
+								WorldPoint tileLocation = new WorldPoint(maidenLoc.getX() + x, maidenLoc.getY() + y, maidenLoc.getPlane());
+								int distance = player.getWorldLocation().distanceTo(tileLocation);
+
+								if (distance < minDistance)
+								{
+									minDistance = distance;
+								}
+							}
+						}
+						projectileDelay = getTickDelay(minDistance);
+					}
+
+					Hit hit = new Hit(dmg, player.getName(), projectileDelay);
+					sendHit(hit);
+					if (config.showMaidenHp() && !config.syncHits())
+						maidenHandler.queueDamage(hit, true);
+				}
+			}
+		}
+	}
+
+	@Subscribe
+	protected void onHit(Hit hit)
+	{
+		boolean isLocalPlayer = Objects.equals(hit.getPlayer(), client.getLocalPlayer().getName());
+
+		if (config.showMaidenHp() && inMaidenRegion())
+		{
+			if (!isLocalPlayer || config.syncHits())
+			{
+				maidenHandler.queueDamage(hit, false);
+			}
+		}
+
+		if (config.partyHits() && !isLocalPlayer)
+		{
+			partyHitsOverlay.addHit(hit, config.duration());
+		}
+	}
+
+	@Subscribe
+	protected void onNpcSpawned(NpcSpawned event)
+	{
+		if (!inTob || !inMaidenRegion())
+			return;
+
+		NPC npc = event.getNpc();
+		int npcId = npc.getId();
+		switch (npcId)
+		{
+			case NpcID.THE_MAIDEN_OF_SUGADINTI: // regular mode
+			case NpcID.THE_MAIDEN_OF_SUGADINTI_10822: // hard mode
+			case NpcID.THE_MAIDEN_OF_SUGADINTI_10814: // entry mode
+				if (config.showMaidenHp())
+					maidenHandler.init(npc);
+				break;
+		}
+	}
+
+	@Subscribe
+	protected void onNpcDespawned(NpcDespawned event)
+	{
+		if (!inTob || !inMaidenRegion())
+			return;
+
+		String npcName = event.getNpc().getName();
+		if (Objects.equals(npcName, "The Maiden of Sugadinti"))
+		{
+			if (maidenHandler.isMaidenActive())
+				maidenHandler.deactivate();
+		}
+	}
+
+	private int getTickDelay(int distance)
+	{
+		Player player = client.getLocalPlayer();
+		if (player == null)
+			return 0;
+
+		PlayerComposition playerComposition = player.getPlayerComposition();
+		if (playerComposition == null)
+			return 0;
+
+		int weaponUsed = playerComposition.getEquipmentId(KitType.WEAPON);
+		if (RANGED_BOWS.contains(weaponUsed))
+		{
+			return (int) Math.floor((3 + distance) / 6.0) + 2;
+		}
+		else if (RANGED_THROWN.contains(weaponUsed))
+		{
+			return (int) Math.floor(distance / 6.0) + 2;
+		}
+		else if (POWERED_STAVES.contains(weaponUsed))
+		{
+			return (int) Math.floor((1 + distance) / 3.0) + 2;
+		}
+		else if (SHADOW.contains(weaponUsed))
+		{
+			return (int) Math.floor((1 + distance) / 3.0) + 3;
+		}
+		else if (weaponUsed == ItemID.ZARYTE_CROSSBOW)
+		{
+			return 3; // zcb spec has a set projectile delay of 3, later differentiate between auto & spec
+		}
+		else if (weaponUsed == ItemID.TONALZTICS_OF_RALOS)
+		{
+			return 2;
+		}
+		return 1; // Assuming all other weapons have a delay of 1, later fix for multi tick weapons like claws/dualies
+	}
+
+	private void sendHit(Hit hit)
+	{
+		if (partyService.isInParty())
+		{
+			if (config.ownHits() && Objects.equals(hit.getPlayer(), client.getLocalPlayer().getName()))
+				partyHitsOverlay.addHit(hit, config.duration());
+
+			clientThread.invokeLater(() -> partyService.send(hit));
+		}
 	}
 
 	public void _updateActiveRegions()
@@ -405,9 +586,9 @@ public class PartyTobXpDropsPlugin extends Plugin
 
 	private void updateInActiveRegion()
 	{
-		if (client.getMapRegions() != null)
+		if (client.getTopLevelWorldView().getMapRegions() != null)
 		{
-			for (int regionId : client.getMapRegions())
+			for (int regionId : client.getTopLevelWorldView().getMapRegions())
 			{
 				if (activeRegions.contains(regionId))
 				{
@@ -585,5 +766,10 @@ public class PartyTobXpDropsPlugin extends Plugin
 			return attackStyles[currentAttackStyleVarbit];
 		}
 		return AttackStyle.ACCURATE;
+	}
+
+	private boolean inMaidenRegion()
+	{
+		return ArrayUtils.contains(client.getTopLevelWorldView().getMapRegions(), MAIDEN_REGIONID);
 	}
 }
